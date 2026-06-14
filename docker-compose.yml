@@ -1,0 +1,276 @@
+version: '3.8'
+
+# ============================================================
+# 水转大纺车动力学仿真与能效分析系统 v1.2.0
+# 架构: 微服务 + 事件驱动 (Redis Pub/Sub)
+# ============================================================
+
+x-backend-common: &backend-common
+  build:
+    context: ./backend
+    dockerfile: Dockerfile
+  environment:
+    - SPINNING_CONFIG_PATH=/app/config.yaml
+    - TZ=${TZ}
+  volumes:
+    - ./backend/config.yaml:/app/config.yaml:ro
+  depends_on:
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+  networks:
+    - internal
+
+services:
+  # ============================================================
+  # 基础设施层
+  # ============================================================
+
+  redis:
+    image: redis:${REDIS_VERSION}
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+    networks:
+      - internal
+    restart: unless-stopped
+
+  influxdb:
+    image: influxdb:${INFLUXDB_VERSION}
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=${DOCKER_INFLUXDB_INIT_MODE}
+      - DOCKER_INFLUXDB_INIT_USERNAME=${DOCKER_INFLUXDB_INIT_USERNAME}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${DOCKER_INFLUXDB_INIT_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      - TZ=${TZ}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping", "--host", "http://localhost:8086"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - internal
+    restart: unless-stopped
+
+  mosquitto:
+    image: eclipse-mosquitto:${MOSQUITTO_VERSION}
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 sh -c 'echo > /dev/tcp/127.0.0.1/1883' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - internal
+    restart: unless-stopped
+
+  # ============================================================
+  # InfluxDB 初始化 - 降采样 Task (一次性作业，完成后退出)
+  # ============================================================
+
+  influxdb-init:
+    build:
+      context: ./influxdb
+      dockerfile: Dockerfile
+    environment:
+      - INFLUXDB_URL=${INFLUXDB_URL}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      - DOCKER_INFLUXDB_INIT_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+      - TZ=${TZ}
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: "no"
+
+  # ============================================================
+  # 纺车 Modbus TCP 模拟器
+  # 支持多种水流模式和纱线规格
+  # ============================================================
+
+  simulator:
+    build:
+      context: ./simulator
+      dockerfile: Dockerfile
+    command: [
+      "python", "simulator.py",
+      "--water-mode", "${SIMULATOR_WATER_MODE}",
+      "--yarn-spec", "${SIMULATOR_YARN_SPEC}",
+      "--modbus-host", "${SIMULATOR_MODBUS_HOST}",
+      "--modbus-port", "${SIMULATOR_MODBUS_PORT}",
+      "--report-interval", "${SIMULATOR_REPORT_INTERVAL}"
+    ]
+    ports:
+      - "${SIMULATOR_MODBUS_PORT}:${SIMULATOR_MODBUS_PORT}"
+    environment:
+      - WATER_MODE=${SIMULATOR_WATER_MODE}
+      - YARN_SPEC=${SIMULATOR_YARN_SPEC}
+      - MODBUS_HOST=${SIMULATOR_MODBUS_HOST}
+      - MODBUS_PORT=${SIMULATOR_MODBUS_PORT}
+      - REPORT_INTERVAL=${SIMULATOR_REPORT_INTERVAL}
+      - TZ=${TZ}
+    healthcheck:
+      test: ["CMD", "python", "-c",
+        "import socket; s=socket.socket(); s.settimeout(1); s.connect(('127.0.0.1', 5020)); s.close(); print('OK')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - internal
+    restart: unless-stopped
+
+  # ============================================================
+  # 微服务层
+  # ============================================================
+
+  # ---------- 微服务 1: Modbus 数据采集 ----------
+  modbus-receiver:
+    <<: *backend-common
+    command: ["python", "-m", "services.modbus_receiver"]
+    environment:
+      - SPINNING_CONFIG_PATH=/app/config.yaml
+      - MODBUS_HOST=${MODBUS_HOST}
+      - MODBUS_PORT=${MODBUS_PORT}
+      - MODBUS_SLAVE_ID=${MODBUS_SLAVE_ID}
+      - MODBUS_POLL_INTERVAL=${MODBUS_POLL_INTERVAL}
+      - TZ=${TZ}
+    depends_on:
+      redis:
+        condition: service_healthy
+      simulator:
+        condition: service_healthy
+
+  # ---------- 微服务 2: 动力学仿真 ----------
+  dynamics-simulator:
+    <<: *backend-common
+    command: ["python", "-m", "services.dynamics_simulator"]
+
+  # ---------- 微服务 3: 遗传算法多目标优化 ----------
+  efficiency-optimizer:
+    <<: *backend-common
+    command: ["python", "-m", "services.efficiency_optimizer"]
+
+  # ---------- 微服务 4: 告警检测与 MQTT 推送 ----------
+  alarm-mqtt:
+    <<: *backend-common
+    command: ["python", "-m", "services.alarm_mqtt"]
+    environment:
+      - SPINNING_CONFIG_PATH=/app/config.yaml
+      - MQTT_HOST=${MQTT_HOST}
+      - MQTT_PORT=${MQTT_PORT}
+      - TZ=${TZ}
+    depends_on:
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+
+  # ============================================================
+  # API 网关 (FastAPI + Gunicorn + Uvicorn Worker)
+  # ============================================================
+
+  api-gateway:
+    <<: *backend-common
+    command: [
+      "gunicorn", "app.main:app",
+      "-c", "gunicorn_conf.py",
+      "--workers", "${GUNICORN_WORKERS}",
+      "--timeout", "${GUNICORN_TIMEOUT}"
+    ]
+    expose:
+      - "8000"
+    environment:
+      - SPINNING_CONFIG_PATH=/app/config.yaml
+      - INFLUXDB_URL=${INFLUXDB_URL}
+      - INFLUXDB_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+      - INFLUXDB_ORG=${DOCKER_INFLUXDB_INIT_ORG}
+      - INFLUXDB_BUCKET=${DOCKER_INFLUXDB_INIT_BUCKET}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS}
+      - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT}
+      - TZ=${TZ}
+    depends_on:
+      redis:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+      dynamics-simulator:
+        condition: service_started
+      efficiency-optimizer:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  # ============================================================
+  # Nginx: 前端静态服务 (Gzip) + API/WS 反向代理
+  # ============================================================
+
+  nginx:
+    build:
+      context: .
+      dockerfile: ./nginx/Dockerfile
+    ports:
+      - "${NGINX_PORT}:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/nginx-health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - internal
+      - default
+    restart: unless-stopped
+
+# ============================================================
+# 网络
+# ============================================================
+
+networks:
+  internal:
+    driver: bridge
+    internal: false  # 设为 true 可完全隔离内部网络，外部无法直接访问各服务
+  default:
+    driver: bridge
+
+# ============================================================
+# 持久化卷
+# ============================================================
+
+volumes:
+  influxdb-data:
+  influxdb-config:
+  mosquitto-data:
+  mosquitto-log:
+  redis-data:
