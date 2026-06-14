@@ -1,0 +1,173 @@
+# ============================================================
+# 水转大纺车系统 - 全局参数配置
+# 所有硬编码参数集中在此，任何模块不允许内部写死
+# ============================================================
+
+version: "1.2.0"
+
+# ---------- Redis 消息总线 ----------
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  password: null
+  socket_timeout: 5.0
+
+# ---------- Pub/Sub 主题定义 ----------
+topics:
+  # 采集完成 -> 动力学服务
+  raw_data_collected: "spinning:raw:collected"
+  # 动力学仿真完成 -> 告警 & API网关
+  simulation_result: "spinning:sim:result"
+  # 告警事件 -> API网关 & MQTT
+  alarm_event: "spinning:alarm:event"
+  # 前端发起优化请求 -> 优化服务
+  optimization_request: "spinning:opt:request"
+  # 优化结果 -> API网关
+  optimization_result: "spinning:opt:result"
+  # API网关广播给前端WebSocket
+  api_broadcast: "spinning:api:broadcast"
+
+# ---------- Modbus 采集 ----------
+modbus:
+  host: "localhost"
+  port: 5020
+  timeout: 5
+  register_scale: 100.0
+  num_spindles: 32
+  collection_interval: 5.0
+  # 寄存器地址映射
+  register_map:
+    water_wheel_rpm: 0x0000
+    water_flow_velocity: 0x0001
+    spindle_rpm_start: 0x0010
+    yarn_tension_start: 0x0030
+    yarn_twist_start: 0x0050
+    yarn_break_start: 0x0070
+    power_consumption: 0x0090
+    spindle_break_count: 0x0091
+    total_break_count: 0x0092
+    run_time_hours: 0x0093
+    run_time_minutes: 0x0094
+  # 特殊缩放（除 REGISTER_SCALE 外再除）
+  extra_tension_divisor: 100.0
+
+# ---------- 水轮动力学 ----------
+water_wheel:
+  gravity: 9.81
+  water_density: 1000.0
+  # calculate_torque 参数
+  blade_width: 0.3
+  num_blades: 8
+  flow_coeff: 0.7
+  force_coeff: 0.85
+  torque_distribute_factor: 0.25
+  # calculate_rotational_speed 参数
+  wheel_mass: 500.0
+  angular_coeff: 0.3
+  # 默认值
+  default_radius: 1.5
+  default_blade_angle: 45.0
+  default_water_speed: 2.5
+
+# ---------- 皮带传动 ----------
+transmission:
+  gear_ratio: 8.0
+  mechanical_efficiency: 0.85
+  base_slip_rate: 0.02
+  pulley_radius_driver: 0.3
+  pulley_radius_driven: 0.15
+  # 欧拉皮带打滑默认参数
+  default_belt_friction: 0.35
+  default_wrap_angle_deg: 180.0
+  default_initial_tension: 200.0
+  # 滑移率分段
+  elastic_weight_base: 0.3
+  elastic_weight_proportional: 0.7
+  severe_slip_floor: 0.08
+  severe_slip_scale: 0.9
+  severe_slip_ceiling: 0.95
+
+# ---------- 锭子动力学 ----------
+spindle:
+  friction_base: 0.05
+  air_resistance_coeff: 0.001
+  # 波动幅度
+  fluctuation_ratio: 0.02
+  noise_ratio: 0.005
+  # 张力
+  base_tension: 5.0
+  yarn_density: 0.001
+  centripetal_coeff: 0.1
+  # 捻度
+  delivery_rate: 0.5
+  # 断头
+  default_max_tension: 15.0
+  breakage_base_prob: 0.001
+  breakage_exp_coeff: 3.0
+  breakage_trigger_ratio: 0.8
+  breakage_scale: 0.01
+  # 每锭速度分配系数
+  output_speed_per_spindle: 0.95
+
+# ---------- 告警阈值 ----------
+alarm:
+  max_breakage_rate: 5.0
+  speed_deviation_low: 0.8
+  speed_deviation_high: 1.2
+  tension_min: 3.0
+  tension_max: 18.0
+  # MQTT
+  mqtt:
+    broker: "localhost"
+    port: 1883
+    topic: "spinning/alerts"
+    client_id: "alarm_service"
+    keepalive: 60
+
+# ---------- 遗传算法优化 ----------
+optimization:
+  # 搜索空间
+  num_spindles_min: 16
+  num_spindles_max: 64
+  blade_angle_min: 15.0
+  blade_angle_max: 75.0
+  # 进化参数
+  default_population: 30
+  default_generations: 50
+  mutation_rate: 0.15
+  mutation_spindle_delta: 5
+  mutation_blade_delta: 5.0
+  crossover_alpha_random: true
+  tournament_size: 3
+  elite_count: 1
+  # 目标归一化上限
+  norm_efficiency_max: 20.0
+  norm_production_max: 80.0
+  norm_max_twist_cv_floor: 1e-6
+  # 约束惩罚系数
+  penalty_tension: 10.0
+  penalty_twist_cv: 50.0
+  penalty_breakage: 20.0
+  invalid_tension_penalty_bias: 0.1
+  # 默认权重（归一化后）
+  default_weights:
+    energy_efficiency: 0.7
+    production: 0.3
+    twist_uniformity: 0.0
+    low_breakage: 0.0
+
+# ---------- InfluxDB ----------
+influxdb:
+  url: "http://localhost:8086"
+  token: "spinning-token"
+  org: "spinning-org"
+  bucket: "spinning-bucket"
+
+# ---------- API 网关 ----------
+api_gateway:
+  host: "0.0.0.0"
+  port: 8000
+  cors_origins: ["*"]
+  # 等待微服务结果的超时（秒）
+  response_timeout: 30.0
