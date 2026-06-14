@@ -1,0 +1,55 @@
+# 版本控制
+.git/
+.gitignore
+.github/
+.gitattributes
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# 日志
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+
+# 环境变量
+.env.local
+.env.*.local
+
+# 文档（可选，如需减小镜像可注释）
+# README.md
+# docs/
+
+# 测试
+tests/
+*.test.py
+test_*.py
+_regression_*.py
+
+# 构建产物
+build/
+dist/
