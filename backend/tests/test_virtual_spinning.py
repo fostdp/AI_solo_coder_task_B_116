@@ -62,10 +62,10 @@ class TestVirtualSpinningEngineInit:
         assert engine.session_id == "test_session_123"
 
     def test_initial_fiber_pool_created(self):
-        """正常场景：初始化时纤维池应创建"""
+        """正常场景：初始化时纤维池应创建（默认MEDIUM档=120）"""
         engine = VirtualSpinningEngine()
-        assert len(engine._fiber_pool) == 200
-        assert len(engine.state.fibers) == 30
+        assert len(engine._fiber_pool) == 120
+        assert len(engine.state.fibers) == 20
 
     def test_fiber_colors_match_cotton(self):
         """正常场景：默认棉花纤维颜色正确"""
