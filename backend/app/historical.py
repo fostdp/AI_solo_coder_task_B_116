@@ -230,7 +230,7 @@ class EfficiencyCalculator:
         utilization_rate: float = 0.8
     ) -> Dict:
         """计算多种纺车对比结果"""
-        if wheel_types is None:
+        if wheel_types is None or len(wheel_types) == 0:
             wheel_types = ["hand_spun", "foot_treadle", "water_wheel"]
 
         specs = HistoricalSpinningWheels.get_all_specs()
