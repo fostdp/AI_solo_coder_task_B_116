@@ -277,3 +277,152 @@ class RegisterMap:
     RUN_TIME_HOURS = 0x0093
     RUN_TIME_MINUTES = 0x0094
     REGISTER_SCALE = 100
+
+
+class WheelTypeConfig:
+    """历史纺车类型配置"""
+    TYPES = {
+        "water_wheel": {
+            "name": "水转大纺车",
+            "power_source": "water",
+            "num_spindles": 32,
+            "max_rpm": 60.0,
+            "transmission_ratio": 12.0,
+            "mechanical_efficiency": 0.72,
+            "inertia": 50.0,
+            "friction_coeff": 0.05
+        },
+        "foot_treadle": {
+            "name": "脚踏纺车",
+            "power_source": "human_foot",
+            "num_spindles": 3,
+            "max_rpm": 80.0,
+            "transmission_ratio": 3.5,
+            "mechanical_efficiency": 0.60,
+            "inertia": 5.0,
+            "friction_coeff": 0.08,
+            "human_power_w": 60.0
+        },
+        "hand_spun": {
+            "name": "手摇纺车",
+            "power_source": "human_hand",
+            "num_spindles": 1,
+            "max_rpm": 120.0,
+            "transmission_ratio": 1.0,
+            "mechanical_efficiency": 0.45,
+            "inertia": 1.0,
+            "friction_coeff": 0.12,
+            "human_power_w": 30.0
+        }
+    }
+
+    CURRENT_TYPE = "water_wheel"
+
+    @classmethod
+    def get_current(cls) -> dict:
+        return cls.TYPES[cls.CURRENT_TYPE]
+
+    @classmethod
+    def set_type(cls, wheel_type: str):
+        if wheel_type not in cls.TYPES:
+            raise ValueError(f"未知纺车类型: {wheel_type}")
+        cls.CURRENT_TYPE = wheel_type
+        cfg = cls.TYPES[wheel_type]
+        WaterWheelConfig.MAX_RPM = cfg["max_rpm"]
+        WaterWheelConfig.INERTIA = cfg["inertia"]
+        WaterWheelConfig.FRICTION_COEFF = cfg["friction_coeff"]
+        BeltDriveConfig.DRIVEN_PULLEY_RATIO = cfg["transmission_ratio"]
+        BeltDriveConfig.EFFICIENCY = cfg["mechanical_efficiency"]
+
+
+class FiberTypeConfig:
+    """纤维类型配置"""
+    FIBERS = {
+        "cotton": {
+            "name": "棉花",
+            "fineness_dtex": 1.6,
+            "length_mm_avg": 28.0,
+            "tenacity_cn_dtex": 2.8,
+            "elongation_percent": 7.0,
+            "friction_coeff": 0.28,
+            "typical_tension_cn": 25.0,
+            "break_threshold_cn": 60.0,
+            "typical_twist_per_m": 380.0,
+            "color": "#FFF8E7"
+        },
+        "hemp": {
+            "name": "苎麻",
+            "fineness_dtex": 6.5,
+            "length_mm_avg": 60.0,
+            "tenacity_cn_dtex": 4.2,
+            "elongation_percent": 3.5,
+            "friction_coeff": 0.35,
+            "typical_tension_cn": 35.0,
+            "break_threshold_cn": 85.0,
+            "typical_twist_per_m": 320.0,
+            "color": "#F5E6C8"
+        },
+        "flax": {
+            "name": "亚麻",
+            "fineness_dtex": 3.8,
+            "length_mm_avg": 50.0,
+            "tenacity_cn_dtex": 3.8,
+            "elongation_percent": 3.0,
+            "friction_coeff": 0.33,
+            "typical_tension_cn": 30.0,
+            "break_threshold_cn": 75.0,
+            "typical_twist_per_m": 300.0,
+            "color": "#E8D4A8"
+        },
+        "silk": {
+            "name": "桑蚕丝",
+            "fineness_dtex": 3.0,
+            "length_mm_avg": 1200.0,
+            "tenacity_cn_dtex": 3.8,
+            "elongation_percent": 20.0,
+            "friction_coeff": 0.22,
+            "typical_tension_cn": 20.0,
+            "break_threshold_cn": 50.0,
+            "typical_twist_per_m": 450.0,
+            "color": "#FFF5F0"
+        },
+        "wool": {
+            "name": "绵羊毛",
+            "fineness_dtex": 4.0,
+            "length_mm_avg": 80.0,
+            "tenacity_cn_dtex": 1.8,
+            "elongation_percent": 35.0,
+            "friction_coeff": 0.30,
+            "typical_tension_cn": 22.0,
+            "break_threshold_cn": 45.0,
+            "typical_twist_per_m": 350.0,
+            "color": "#FAF0E6"
+        }
+    }
+
+    CURRENT_FIBER = "cotton"
+
+    @classmethod
+    def get_current(cls) -> dict:
+        return cls.FIBERS[cls.CURRENT_FIBER]
+
+    @classmethod
+    def set_fiber(cls, fiber_type: str):
+        if fiber_type not in cls.FIBERS:
+            raise ValueError(f"未知纤维类型: {fiber_type}")
+        cls.CURRENT_FIBER = fiber_type
+
+
+class AutoPiecingConfig:
+    """自动生头模拟配置"""
+    ENABLED = True
+    SUCCESS_RATE = 0.95
+    MIN_PIECING_TIME_MS = 2500
+    MAX_PIECING_TIME_MS = 5000
+    DETECTION_LATENCY_MS = 20.0
+    CAMERA_COUNT = 4
+    SPINDLES_PER_CAMERA = 8
+    DETECTION_THRESHOLD = 0.65
+    FALSE_POSITIVE_RATE = 0.02
+    FALSE_NEGATIVE_RATE = 0.03
+
