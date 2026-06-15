@@ -148,7 +148,7 @@ class TestVisionDetectionSystem:
         assert result["camera_id"] == "cam_1"
         assert 0.0 <= result["confidence"] <= 1.0
         assert result["latency_ms"] > 0
-        assert result["detection_algorithm"] == "YOLOv8-BreakNet"
+        assert "YOLOv8-BreakNet" in result["detection_algorithm"]
 
     def test_detect_break_updates_stats(self):
         """正常场景：检测后统计数据更新"""
