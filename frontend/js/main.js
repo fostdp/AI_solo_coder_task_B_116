@@ -13,6 +13,11 @@ class App {
         this.api = apiClient;
         this.lastUpdateTime = 0;
 
+        this.historicalPanel = null;
+        this.fiberPanel = null;
+        this.detectionPanel = null;
+        this.virtualSpinningPanel = null;
+
         this.init();
         this.bindControls();
         this.panel.bindGlobalControls(
@@ -20,6 +25,7 @@ class App {
             () => this.runOptimization(),
         );
         this.panel.renderAlarms();
+        this.bindFeatureTabs();
         this.startDataLoop();
     }
 
@@ -140,6 +146,39 @@ class App {
         } finally {
             btn.disabled = false;
             btn.textContent = '运行优化';
+        }
+    }
+
+    bindFeatureTabs() {
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
+        });
+    }
+
+    switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.tab === tabName);
+        });
+        document.querySelectorAll('.tab-content').forEach(c => {
+            c.classList.toggle('active', c.id === `tab-${tabName}`);
+        });
+        this.lazyLoadPanel(tabName);
+    }
+
+    lazyLoadPanel(tabName) {
+        if (tabName === 'historical' && !this.historicalPanel) {
+            this.historicalPanel = new HistoricalComparisonPanel('historical-panel-container', this.api);
+            this.historicalPanel.init();
+        } else if (tabName === 'fiber' && !this.fiberPanel) {
+            this.fiberPanel = new FiberOptimizationPanel('fiber-panel-container', this.api);
+            this.fiberPanel.init();
+        } else if (tabName === 'detection' && !this.detectionPanel) {
+            this.detectionPanel = new BreakDetectionPanel('detection-panel-container', this.api);
+            this.detectionPanel.init();
+        } else if (tabName === 'virtual' && !this.virtualSpinningPanel) {
+            this.virtualSpinningPanel = new VirtualSpinningPanel('virtual-spinning-container', this.api);
+            this.virtualSpinningPanel.init();
         }
     }
 }
