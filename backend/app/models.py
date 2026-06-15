@@ -121,3 +121,41 @@ class ModbusConfig(BaseModel):
     host: str = Field(default="localhost", description="Modbus TCP主机")
     port: int = Field(default=5020, description="Modbus TCP端口")
     timeout: int = Field(default=5, description="超时时间(秒)")
+
+
+class HistoricalComparisonRequest(BaseModel):
+    wheel_types: Optional[List[str]] = Field(None, description="纺车类型列表，默认全部对比")
+    operating_hours: float = Field(default=10.0, ge=1, le=24, description="每日运行小时数")
+    utilization_rate: float = Field(default=0.8, ge=0.1, le=1.0, description="设备利用率")
+
+
+class FiberOptimizationRequest(BaseModel):
+    fiber_type: str = Field(description="纤维类型: cotton/hemp/flax/silk/wool")
+    yarn_count_tex: Optional[float] = Field(None, gt=0, description="纱线支数(tex)")
+    roving_count_tex: Optional[float] = Field(None, gt=0, description="粗纱支数(tex)")
+    quality_priority: str = Field(default="balanced", description="质量优先级: quality/balanced/speed")
+
+
+class FiberComparisonRequest(BaseModel):
+    fiber_types: List[str] = Field(description="纤维类型列表")
+    yarn_count_tex: float = Field(100.0, gt=0, description="统一纱线支数(tex)")
+    quality_priority: str = Field(default="balanced", description="质量优先级")
+
+
+class BreakDetectionRequest(BaseModel):
+    spindle_id: int = Field(ge=0, le=31, description="锭子编号")
+    speed_rpm: float = Field(gt=0, description="锭子转速(rpm)")
+    tension_cn: float = Field(gt=0, description="纱线张力(cN)")
+    fiber_type: str = Field(default="cotton", description="纤维类型")
+
+
+class VirtualSpinningCreateRequest(BaseModel):
+    water_speed: Optional[float] = Field(2.0, ge=0.1, le=8.0, description="初始水流速度(m/s)")
+    fiber_type: Optional[str] = Field("cotton", description="初始纤维类型")
+
+
+class VirtualSpinningControlRequest(BaseModel):
+    session_id: str = Field(description="会话ID")
+    action: str = Field(description="操作: start/pause/reset")
+    water_speed: Optional[float] = Field(None, ge=0.1, le=8.0, description="调节水流速度")
+    fiber_type: Optional[str] = Field(None, description="更换纤维类型")
