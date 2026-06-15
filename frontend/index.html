@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>古代水转大纺车动力学仿真与能效分析系统</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <h1>古代水转大纺车动力学仿真与能效分析系统</h1>
+            <p class="subtitle">Ancient Water-Powered Spinning Wheel Dynamics & Energy Efficiency System</p>
+            <div class="connection-status">
+                <span id="api-status" class="status-indicator status-disconnected">API未连接</span>
+                <span id="ws-status" class="status-indicator status-disconnected">WebSocket未连接</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="left-panel">
+                <div class="panel data-panel">
+                    <h2>实时数据监控</h2>
+                    <div class="data-grid">
+                        <div class="data-item">
+                            <span class="data-label">水轮转速</span>
+                            <span class="data-value" id="wheel-speed">0</span>
+                            <span class="data-unit">rpm</span>
+                        </div>
+                        <div class="data-item">
+                            <span class="data-label">锭子平均转速</span>
+                            <span class="data-value" id="spindle-speed">0</span>
+                            <span class="data-unit">rpm</span>
+                        </div>
+                        <div class="data-item">
+                            <span class="data-label">纱线张力</span>
+                            <span class="data-value" id="tension">0</span>
+                            <span class="data-unit">N</span>
+                        </div>
+                        <div class="data-item">
+                            <span class="data-label">纱线捻度</span>
+                            <span class="data-value" id="twist">0</span>
+                            <span class="data-unit">T/m</span>
+                        </div>
+                        <div class="data-item">
+                            <span class="data-label">功耗</span>
+                            <span class="data-value" id="power">0</span>
+                            <span class="data-unit">kW</span>
+                        </div>
+                        <div class="data-item">
+                            <span class="data-label">能效比</span>
+                            <span class="data-value" id="efficiency">0</span>
+                            <span class="data-unit">m/min·kW</span>
+                        </div>
+                        <div class="data-item">
+                            <span class="data-label">断头率</span>
+                            <span class="data-value" id="breakage-rate">0</span>
+                            <span class="data-unit">%</span>
+                        </div>
+                        <div class="data-item">
+                            <span class="data-label">运行状态</span>
+                            <span class="data-value status-running" id="status">模拟模式</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel control-panel">
+                    <h3>控制面板</h3>
+                    <div class="control-group">
+                        <label for="speed-control">水轮转速 (模拟模式)</label>
+                        <input type="range" id="speed-control" min="0" max="60" value="30">
+                        <span id="speed-value">30 rpm</span>
+                    </div>
+                    <div class="control-group">
+                        <label>
+                            <input type="checkbox" id="show-yarn" checked>
+                            显示纱线
+                        </label>
+                    </div>
+                    <div class="control-group">
+                        <label>
+                            <input type="checkbox" id="show-water" checked>
+                            显示水流
+                        </label>
+                    </div>
+                    <div class="control-group">
+                        <label>
+                            <input type="checkbox" id="use-api">
+                            连接后端API
+                        </label>
+                    </div>
+                    <div class="control-group">
+                        <label for="api-url">API地址</label>
+                        <input type="text" id="api-url" value="http://localhost:8000">
+                    </div>
+                    <div class="control-group">
+                        <button id="reset-view" class="btn">重置视角</button>
+                        <button id="toggle-rotation" class="btn">暂停/继续</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="three-container" class="three-container"></div>
+
+            <div class="right-panel">
+                <div class="panel charts-panel">
+                    <div class="chart-container">
+                        <h3>转速-捻度曲线</h3>
+                        <canvas id="twist-chart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>能效分析</h3>
+                        <canvas id="efficiency-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="panel optimization-panel">
+                    <h3>能效优化 (遗传算法)</h3>
+                    <div class="optimization-form">
+                        <div class="form-row">
+                            <label>水流速度 (m/s)</label>
+                            <input type="number" id="opt-water-speed" value="2.5" step="0.1" min="0.1" max="10">
+                        </div>
+                        <div class="form-row">
+                            <label>最小张力 (N)</label>
+                            <input type="number" id="opt-min-tension" value="3.0" step="0.1">
+                        </div>
+                        <div class="form-row">
+                            <label>最大张力 (N)</label>
+                            <input type="number" id="opt-max-tension" value="15.0" step="0.1">
+                        </div>
+                        <div class="form-row">
+                            <label>最大捻度CV (%)</label>
+                            <input type="number" id="opt-max-cv" value="5.0" step="0.1">
+                        </div>
+                        <div class="form-row">
+                            <label>种群大小</label>
+                            <input type="number" id="opt-population" value="30" step="10" min="10" max="200">
+                        </div>
+                        <div class="form-row">
+                            <label>迭代代数</label>
+                            <input type="number" id="opt-generations" value="50" step="10" min="10" max="500">
+                        </div>
+
+                        <div class="form-subsection">
+                            <h4>皮带传动参数（打滑修正）</h4>
+                            <div class="form-row">
+                                <label>皮带摩擦系数 μ</label>
+                                <input type="number" id="opt-belt-friction" value="0.35" step="0.05" min="0.05" max="0.9">
+                            </div>
+                            <div class="form-row">
+                                <label>包角 (度)</label>
+                                <input type="number" id="opt-wrap-angle" value="180" step="10" min="90" max="270">
+                            </div>
+                            <div class="form-row">
+                                <label>初始张力 (N)</label>
+                                <input type="number" id="opt-belt-tension" value="200" step="10" min="50" max="1000">
+                            </div>
+                        </div>
+
+                        <div class="form-subsection">
+                            <h4>目标权重（自动归一化）</h4>
+                            <div class="form-row">
+                                <label>能效比 <span id="w-eff-val">0.70</span></label>
+                                <input type="range" id="w-efficiency" min="0" max="1" step="0.05" value="0.7">
+                            </div>
+                            <div class="form-row">
+                                <label>生产率 <span id="w-prod-val">0.30</span></label>
+                                <input type="range" id="w-production" min="0" max="1" step="0.05" value="0.3">
+                            </div>
+                            <div class="form-row">
+                                <label>捻度均匀性 <span id="w-twist-val">0.00</span></label>
+                                <input type="range" id="w-twist" min="0" max="1" step="0.05" value="0.0">
+                            </div>
+                            <div class="form-row">
+                                <label>低断头率 <span id="w-break-val">0.00</span></label>
+                                <input type="range" id="w-breakage" min="0" max="1" step="0.05" value="0.0">
+                            </div>
+                        </div>
+
+                        <button id="run-optimization" class="btn btn-primary">运行优化</button>
+                    </div>
+                    <div id="optimization-result" class="optimization-result hidden">
+                        <h4>优化结果</h4>
+                        <div class="result-grid">
+                            <div class="result-item">
+                                <span>最优锭子数</span>
+                                <span id="opt-spindles">-</span>
+                            </div>
+                            <div class="result-item">
+                                <span>最优叶片角</span>
+                                <span id="opt-blade-angle">-</span>
+                            </div>
+                            <div class="result-item">
+                                <span>最大能效比</span>
+                                <span id="opt-efficiency">-</span>
+                            </div>
+                            <div class="result-item">
+                                <span>生产率</span>
+                                <span id="opt-production">-</span>
+                            </div>
+                        </div>
+                        <canvas id="convergence-chart" height="120"></canvas>
+                        <div class="weights-used">
+                            <h5>实际使用权重（归一化）</h5>
+                            <div id="weights-display" class="weights-grid"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel alarm-panel">
+                    <h3>告警信息</h3>
+                    <div id="alarm-list" class="alarm-list">
+                        <div class="alarm-empty">暂无告警</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="info-panel" class="info-panel hidden">
+                <div class="info-panel-header">
+                    <h3 id="info-title">部件信息</h3>
+                    <button id="close-info" class="close-btn">&times;</button>
+                </div>
+                <div class="info-panel-body" id="info-body">
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>水转大纺车 - 中国古代伟大的机械发明 | 动力学仿真与能效分析系统 v1.2.0（微服务架构）</p>
+        </footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <script src="js/scene.js"></script>
+    <script src="js/spinning_frame_3d.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/efficiency_panel.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
