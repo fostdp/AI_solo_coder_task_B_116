@@ -171,3 +171,67 @@ api_gateway:
   cors_origins: ["*"]
   # 等待微服务结果的超时（秒）
   response_timeout: 30.0
+
+# ============================================================
+# 以下为 v1.3.0 新增功能配置（不影响原有功能）
+# ============================================================
+
+# ---------- 历史纺车对比 ----------
+historical_wheels:
+  enabled: true
+  default_operating_hours: 10
+  default_utilization_rate: 0.8
+
+# ---------- 纤维参数优化 ----------
+fiber_optimization:
+  enabled: true
+  default_quality_priority: "balanced"  # quality / balanced / speed
+  default_yarn_count_tex: 100.0
+
+# ---------- 断头检测与自动生头 ----------
+break_detection:
+  enabled: true
+  camera_count: 4
+  spindles_per_camera: 8
+  detection_threshold: 0.65
+  false_positive_rate: 0.02
+  false_negative_rate: 0.03
+  # 自动生头
+  auto_piecing_enabled: true
+  piecing_success_rate: 0.95
+  min_piecing_time_ms: 2500
+  max_piecing_time_ms: 5000
+  # 断头原因概率分布
+  break_causes:
+    tension_peak: 0.35
+    fiber_defect: 0.20
+    improper_twist: 0.15
+    roller_slip: 0.12
+    foreign_matter: 0.08
+    mechanical_vibration: 0.07
+    other: 0.03
+
+# ---------- 公众虚拟纺纱体验 ----------
+virtual_spinning:
+  enabled: true
+  max_sessions: 100
+  default_water_speed: 2.0
+  default_fiber: "cotton"
+  tick_interval_ms: 50
+  # 可选纤维列表及难度
+  available_fibers:
+    - type: "cotton"
+      name: "棉花"
+      difficulty: "easy"
+    - type: "hemp"
+      name: "苎麻"
+      difficulty: "medium"
+    - type: "flax"
+      name: "亚麻"
+      difficulty: "medium"
+    - type: "silk"
+      name: "桑蚕丝"
+      difficulty: "hard"
+    - type: "wool"
+      name: "绵羊毛"
+      difficulty: "medium"
