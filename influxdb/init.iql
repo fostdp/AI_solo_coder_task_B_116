@@ -1,0 +1,15 @@
+CREATE DATABASE "spinning-wheel-data" WITH DURATION 30d REPLICATION 1 NAME "autogen"
+
+CREATE RETENTION POLICY "one_year" ON "spinning-wheel-data" DURATION 365d REPLICATION 1
+
+CREATE CONTINUOUS QUERY "cq_hourly_avg" ON "spinning-wheel-data"
+BEGIN
+  SELECT mean(water_wheel_speed) AS water_wheel_speed,
+         mean(spindle_speed) AS spindle_speed,
+         mean(yarn_tension) AS yarn_tension,
+         mean(twist) AS twist,
+         mean(power) AS power
+  INTO "one_year"."hourly_metrics"
+  FROM "autogen"."spindle_data"
+  GROUP BY time(1h), *
+END
