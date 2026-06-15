@@ -31,9 +31,16 @@ if _BACKEND_ROOT not in sys.path:
 
 from app.models import (
     DynamicsRequest, DynamicsResponse, OptimizationRequest,
-    OptimizationResult, AlarmData
+    OptimizationResult, AlarmData,
+    HistoricalComparisonRequest, FiberOptimizationRequest,
+    FiberComparisonRequest, BreakDetectionRequest,
+    VirtualSpinningCreateRequest, VirtualSpinningControlRequest
 )
 from app.database import db_manager
+from app.historical import HistoricalSpinningWheels, EfficiencyCalculator
+from app.fiber_optimization import FiberDatabase, SpinningParameterOptimizer
+from app.yarn_detection import BreakDetectionSystem, VisionDetectionSystem, AutoPiecingRobot
+from app.virtual_spinning import PublicExperienceManager
 from shared.bus import MessageBus
 from shared.config_loader import get_config, load_config
 
@@ -42,6 +49,10 @@ API_CFG = get_config("api_gateway", default={}) or {}
 RESPONSE_TIMEOUT = float(API_CFG.get("response_timeout", 30.0))
 
 bus = MessageBus.instance()
+
+_break_detection_system = BreakDetectionSystem(num_spindles=32)
+_public_experience_manager = PublicExperienceManager(max_sessions=100)
+_virtual_spinning_task = None
 
 
 # ============================================================
@@ -135,6 +146,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[APIGateway] Redis 订阅失败: {e}")
 
+    global _virtual_spinning_task
+
+    async def _virtual_spinning_ticker():
+        while True:
+            try:
+                _public_experience_manager.tick_all(dt=0.05)
+            except Exception as e:
+                print(f"[APIGateway] 虚拟纺纱tick异常: {e}")
+            await asyncio.sleep(0.05)
+
+    _virtual_spinning_task = asyncio.create_task(_virtual_spinning_ticker())
+    print("[APIGateway] 公众虚拟纺纱体验引擎已启动")
+
     yield
 
     try:
@@ -143,6 +167,11 @@ async def lifespan(app: FastAPI):
         pass
     try:
         bus.close()
+    except Exception:
+        pass
+    try:
+        if _virtual_spinning_task and not _virtual_spinning_task.done():
+            _virtual_spinning_task.cancel()
     except Exception:
         pass
     print("[APIGateway] Shutdown complete")
@@ -363,4 +392,269 @@ async def health_check():
         "modbus": "modbus_receiver 独立服务运行中 (见 docker-compose)",
         "websocket_clients": len(ws_manager.active_connections),
         "timestamp": datetime.now().isoformat(),
+    }
+
+
+# ============================================================
+# 新增功能一：历史纺车技术对比 API
+# ============================================================
+@app.get("/api/historical/wheels", tags=["历史纺车对比"])
+async def get_historical_wheel_list():
+    """获取所有历史纺车规格列表"""
+    specs = HistoricalSpinningWheels.get_all_specs()
+    result = []
+    for key, spec in specs.items():
+        result.append({
+            "wheel_type": spec.wheel_type,
+            "wheel_name": spec.wheel_name,
+            "era": spec.era,
+            "dynasty": spec.dynasty,
+            "year_range": spec.year_range,
+            "power_source": spec.power_source,
+            "num_spindles": spec.num_spindles,
+            "description": spec.description
+        })
+    return {"wheels": result}
+
+
+@app.get("/api/historical/wheels/{wheel_type}", tags=["历史纺车对比"])
+async def get_historical_wheel_detail(wheel_type: str):
+    """获取单个纺车详细规格"""
+    spec = HistoricalSpinningWheels.get_spec(wheel_type)
+    if not spec:
+        raise HTTPException(status_code=404, detail=f"Unknown wheel type: {wheel_type}")
+    efficiency = EfficiencyCalculator.calculate_efficiency_metrics(spec)
+    quality = EfficiencyCalculator.calculate_quality_metrics(spec)
+    return {
+        "spec": {
+            "wheel_type": spec.wheel_type,
+            "wheel_name": spec.wheel_name,
+            "era": spec.era,
+            "dynasty": spec.dynasty,
+            "year_range": spec.year_range,
+            "power_source": spec.power_source,
+            "num_spindles": spec.num_spindles,
+            "wheel_radius_m": spec.wheel_radius_m,
+            "transmission_ratio": spec.transmission_ratio,
+            "mechanical_efficiency": spec.mechanical_efficiency,
+            "max_spindle_rpm": spec.max_spindle_rpm,
+            "max_daily_production_kg": spec.max_daily_production_kg,
+            "labor_requirement": spec.labor_requirement,
+            "material": spec.material,
+            "floor_space_m2": spec.floor_space_m2,
+            "cost_relative": spec.cost_relative,
+            "description": spec.description
+        },
+        "efficiency": efficiency,
+        "quality": quality
+    }
+
+
+@app.post("/api/historical/comparison", tags=["历史纺车对比"])
+async def compare_historical_wheels(req: HistoricalComparisonRequest):
+    """对比多种纺车的效率与质量"""
+    result = EfficiencyCalculator.calculate_comparison(
+        wheel_types=req.wheel_types,
+        operating_hours=req.operating_hours,
+        utilization_rate=req.utilization_rate
+    )
+    return result
+
+
+# ============================================================
+# 新增功能二：棉麻丝纤维纺纱参数优化 API
+# ============================================================
+@app.get("/api/fibers", tags=["纤维参数优化"])
+async def get_fiber_list():
+    """获取所有可用纤维特性列表"""
+    fibers = FiberDatabase.get_all_fibers()
+    result = []
+    for key, f in fibers.items():
+        result.append({
+            "fiber_type": f.fiber_type,
+            "fiber_name": f.fiber_name,
+            "origin": f.origin,
+            "color": f.color,
+            "fineness_dtex": f.fineness_dtex,
+            "fiber_length_mm_avg": f.fiber_length_mm_avg,
+            "breaking_tenacity_cn_dtex": f.breaking_tenacity_cn_dtex,
+            "moisture_regain_percent": f.moisture_regain_percent,
+            "typical_count_tex_range": list(f.typical_count_tex_range),
+            "description": f.description
+        })
+    return {"fibers": result}
+
+
+@app.get("/api/fibers/{fiber_type}", tags=["纤维参数优化"])
+async def get_fiber_detail(fiber_type: str):
+    """获取单种纤维详细特性"""
+    fiber = FiberDatabase.get_fiber(fiber_type)
+    if not fiber:
+        raise HTTPException(status_code=404, detail=f"Unknown fiber type: {fiber_type}")
+    return {
+        "fiber_type": fiber.fiber_type,
+        "fiber_name": fiber.fiber_name,
+        "scientific_name": fiber.scientific_name,
+        "origin": fiber.origin,
+        "color": fiber.color,
+        "fiber_length_mm": {
+            "avg": fiber.fiber_length_mm_avg,
+            "min": fiber.fiber_length_mm_min,
+            "max": fiber.fiber_length_mm_max
+        },
+        "fiber_diameter_um": fiber.fiber_diameter_um,
+        "fineness_dtex": fiber.fineness_dtex,
+        "density_g_cm3": fiber.density_g_cm3,
+        "breaking_tenacity_cn_dtex": fiber.breaking_tenacity_cn_dtex,
+        "elongation_at_break_percent": fiber.elongation_at_break_percent,
+        "moisture_regain_percent": fiber.moisture_regain_percent,
+        "modulus_gpa": fiber.modulus_gpa,
+        "friction_coefficient": fiber.friction_coefficient,
+        "crimp_percent": fiber.crimp_percent,
+        "typical_count_tex_range": list(fiber.typical_count_tex_range),
+        "recommended_twist_factor_range": list(fiber.recommended_twist_factor_range),
+        "recommended_draft_range": list(fiber.recommended_draft_range),
+        "max_spindle_speed_rpm": fiber.max_spindle_speed_rpm,
+        "description": fiber.description
+    }
+
+
+@app.post("/api/fibers/optimize", tags=["纤维参数优化"])
+async def optimize_spinning_parameters(req: FiberOptimizationRequest):
+    """基于纤维特性的纺纱参数优化"""
+    fiber = FiberDatabase.get_fiber(req.fiber_type)
+    if not fiber:
+        raise HTTPException(status_code=404, detail=f"Unknown fiber type: {req.fiber_type}")
+    result = SpinningParameterOptimizer.full_spinning_optimization(
+        fiber_type=req.fiber_type,
+        yarn_count_tex=req.yarn_count_tex,
+        roving_count_tex=req.roving_count_tex,
+        quality_priority=req.quality_priority
+    )
+    return result
+
+
+@app.post("/api/fibers/compare", tags=["纤维参数优化"])
+async def compare_fiber_parameters(req: FiberComparisonRequest):
+    """对比多种纤维的纺纱参数"""
+    result = SpinningParameterOptimizer.compare_fibers(
+        fiber_types=req.fiber_types,
+        yarn_count_tex=req.yarn_count_tex,
+        quality_priority=req.quality_priority
+    )
+    return result
+
+
+# ============================================================
+# 新增功能三：自动生头与断头检测模拟 API
+# ============================================================
+@app.post("/api/detection/simulate-break", tags=["断头检测与自动生头"])
+async def simulate_yarn_break(req: BreakDetectionRequest):
+    """模拟纱线断头-检测-自动生头完整流程"""
+    result = _break_detection_system.simulate_break_scenario(
+        spindle_id=req.spindle_id,
+        speed_rpm=req.speed_rpm,
+        tension_cn=req.tension_cn,
+        fiber_type=req.fiber_type
+    )
+    return result
+
+
+@app.get("/api/detection/vision-status", tags=["断头检测与自动生头"])
+async def get_vision_detection_status():
+    """获取机器视觉检测系统状态"""
+    return _break_detection_system.vision_system.get_system_status()
+
+
+@app.get("/api/detection/robot-status", tags=["断头检测与自动生头"])
+async def get_piecing_robot_status():
+    """获取自动生头机械手状态"""
+    return _break_detection_system.piecing_robot.get_performance()
+
+
+@app.get("/api/detection/statistics", tags=["断头检测与自动生头"])
+async def get_detection_statistics(window_seconds: float = None):
+    """获取断头检测系统统计数据"""
+    return _break_detection_system.get_statistics(window_seconds=window_seconds)
+
+
+@app.get("/api/detection/spindle-status", tags=["断头检测与自动生头"])
+async def get_all_spindle_status():
+    """获取所有锭子运行状态"""
+    return {"spindles": _break_detection_system.get_spindle_status()}
+
+
+# ============================================================
+# 新增功能四：公众体验虚拟纺纱 API
+# ============================================================
+@app.post("/api/virtual-spinning/create", tags=["公众虚拟纺纱体验"])
+async def create_virtual_spinning_session(req: VirtualSpinningCreateRequest):
+    """创建虚拟纺纱会话"""
+    session_id = _public_experience_manager.create_session()
+    engine = _public_experience_manager.get_session(session_id)
+    if engine and req.water_speed:
+        engine.set_parameters(water_speed=req.water_speed, fiber_type=req.fiber_type)
+    return {
+        "session_id": session_id,
+        "snapshot": engine.get_snapshot() if engine else None
+    }
+
+
+@app.post("/api/virtual-spinning/control", tags=["公众虚拟纺纱体验"])
+async def control_virtual_spinning(req: VirtualSpinningControlRequest):
+    """控制虚拟纺纱会话（启动/暂停/重置/调节参数）"""
+    engine = _public_experience_manager.get_session(req.session_id)
+    if not engine:
+        raise HTTPException(status_code=404, detail=f"Session not found: {req.session_id}")
+
+    if req.water_speed is not None or req.fiber_type is not None:
+        engine.set_parameters(water_speed=req.water_speed, fiber_type=req.fiber_type)
+
+    if req.action == "start":
+        engine.start()
+    elif req.action == "pause":
+        engine.pause()
+    elif req.action == "reset":
+        engine.reset()
+
+    return {
+        "session_id": req.session_id,
+        "action": req.action,
+        "snapshot": engine.get_snapshot()
+    }
+
+
+@app.get("/api/virtual-spinning/snapshot/{session_id}", tags=["公众虚拟纺纱体验"])
+async def get_virtual_spinning_snapshot(session_id: str):
+    """获取虚拟纺纱实时状态快照"""
+    engine = _public_experience_manager.get_session(session_id)
+    if not engine:
+        raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
+    return engine.get_snapshot()
+
+
+@app.delete("/api/virtual-spinning/session/{session_id}", tags=["公众虚拟纺纱体验"])
+async def close_virtual_spinning_session(session_id: str):
+    """关闭虚拟纺纱会话"""
+    _public_experience_manager.remove_session(session_id)
+    return {"status": "closed", "session_id": session_id}
+
+
+@app.get("/api/virtual-spinning/statistics", tags=["公众虚拟纺纱体验"])
+async def get_virtual_spinning_statistics():
+    """获取公众体验全局统计"""
+    return _public_experience_manager.get_statistics()
+
+
+@app.get("/api/virtual-spinning/fiber-options", tags=["公众虚拟纺纱体验"])
+async def get_virtual_spinning_fiber_options():
+    """获取虚拟纺纱可选纤维列表"""
+    return {
+        "fibers": [
+            {"type": "cotton", "name": "棉花", "difficulty": "简单", "color": "#FFF8E7"},
+            {"type": "hemp", "name": "苎麻", "difficulty": "中等", "color": "#F5E6C8"},
+            {"type": "flax", "name": "亚麻", "difficulty": "中等", "color": "#E8D4A8"},
+            {"type": "silk", "name": "桑蚕丝", "difficulty": "困难", "color": "#FFF5F0"},
+            {"type": "wool", "name": "绵羊毛", "difficulty": "中等", "color": "#FAF0E6"}
+        ]
     }
