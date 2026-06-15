@@ -251,8 +251,8 @@ class SpinningParameterOptimizer:
             "draft_efficiency": round(draft_efficiency, 4),
             "breakage_risk_percent": round(breakage_risk * 100, 3),
             "roller_pressure_n": round(roller_pressure, 1),
-            "delivery_speed_m_min": delivery_speed,
-            "front_roller_speed_rpm": round(delivery_speed * 1000 / (math.pi * 32), 1),
+            "delivery_speed_m_min": delivery_speed_m_min,
+            "front_roller_speed_rpm": round(delivery_speed_m_min * 1000 / (math.pi * 32), 1),
             "advice": draft_advice
         }
 
