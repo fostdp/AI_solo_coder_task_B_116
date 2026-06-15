@@ -17,7 +17,16 @@
             </div>
         </header>
 
+        <nav class="feature-tabs">
+            <button class="tab-btn active" data-tab="main">🏭 主监控台</button>
+            <button class="tab-btn" data-tab="historical">🏛️ 历史纺车对比</button>
+            <button class="tab-btn" data-tab="fiber">🧶 纤维参数优化</button>
+            <button class="tab-btn" data-tab="detection">🔍 断头检测与生头</button>
+            <button class="tab-btn" data-tab="virtual">🎨 虚拟纺纱体验</button>
+        </nav>
+
         <main class="main-content">
+            <div class="tab-content active" id="tab-main">
             <div class="left-panel">
                 <div class="panel data-panel">
                     <h2>实时数据监控</h2>
@@ -224,6 +233,23 @@
                 <div class="info-panel-body" id="info-body">
                 </div>
             </div>
+            </div>
+
+            <div class="tab-content" id="tab-historical">
+                <div id="historical-panel-container"></div>
+            </div>
+
+            <div class="tab-content" id="tab-fiber">
+                <div id="fiber-panel-container"></div>
+            </div>
+
+            <div class="tab-content" id="tab-detection">
+                <div id="detection-panel-container"></div>
+            </div>
+
+            <div class="tab-content" id="tab-virtual">
+                <div id="virtual-spinning-container"></div>
+            </div>
         </main>
 
         <footer class="footer">
@@ -238,6 +264,10 @@
     <script src="js/charts.js"></script>
     <script src="js/api.js"></script>
     <script src="js/efficiency_panel.js"></script>
+    <script src="js/historical_comparison.js"></script>
+    <script src="js/fiber_optimization_panel.js"></script>
+    <script src="js/break_detection_panel.js"></script>
+    <script src="js/virtual_spinning_panel.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
