@@ -107,7 +107,7 @@ class YarnBreakSimulator:
             confidence_score=round(confidence, 4),
             detected=detected,
             detection_latency_ms=round(latency, 1),
-            auto_piecing=False,
+            auto_piecing_success=False,
             piecing_time_ms=0.0,
             yarn_length_lost_m=0.0,
             downtime_seconds=0.0
@@ -276,9 +276,11 @@ class AutoPiecingRobot:
 
         success = random.random() < self.efficiency
         if break_event.break_cause in ("tension_peak", "foreign_matter"):
-            success *= 0.92
+            if success:
+                success = random.random() < 0.92
         elif break_event.break_cause == "fiber_defect":
-            success *= 0.85
+            if success:
+                success = random.random() < 0.85
 
         base_time = 3500.0
         if break_event.break_position_mm > 600:
@@ -388,7 +390,7 @@ class BreakDetectionSystem:
             },
             "detection": {
                 "detected": break_event.detected,
-                "camera_id": self.vision_system._find_camera(spindle_id)
+                "camera_id": cam.camera_id if (cam := self.vision_system._find_camera(spindle_id)) else None
             },
             "auto_piecing": piecing_result,
             "spindle_status": self.spindle_status[spindle_id]
