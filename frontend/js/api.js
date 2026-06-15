@@ -170,6 +170,127 @@ class ApiClient {
     isWsConnected() {
         return this.wsConnected;
     }
+
+    // ========== 历史纺车对比 API ==========
+    async getHistoricalWheels() {
+        const res = await fetch(`${this.baseUrl}/api/historical/wheels`);
+        return await res.json();
+    }
+
+    async getHistoricalWheelDetail(wheelType) {
+        const res = await fetch(`${this.baseUrl}/api/historical/wheels/${wheelType}`);
+        return await res.json();
+    }
+
+    async compareHistoricalWheels(params = {}) {
+        const res = await fetch(`${this.baseUrl}/api/historical/comparison`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        return await res.json();
+    }
+
+    // ========== 纤维参数优化 API ==========
+    async getFibers() {
+        const res = await fetch(`${this.baseUrl}/api/fibers`);
+        return await res.json();
+    }
+
+    async getFiberDetail(fiberType) {
+        const res = await fetch(`${this.baseUrl}/api/fibers/${fiberType}`);
+        return await res.json();
+    }
+
+    async optimizeFiberParameters(params) {
+        const res = await fetch(`${this.baseUrl}/api/fibers/optimize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        return await res.json();
+    }
+
+    async compareFibers(params) {
+        const res = await fetch(`${this.baseUrl}/api/fibers/compare`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        return await res.json();
+    }
+
+    // ========== 断头检测与自动生头 API ==========
+    async simulateBreak(params) {
+        const res = await fetch(`${this.baseUrl}/api/detection/simulate-break`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        return await res.json();
+    }
+
+    async getVisionStatus() {
+        const res = await fetch(`${this.baseUrl}/api/detection/vision-status`);
+        return await res.json();
+    }
+
+    async getRobotStatus() {
+        const res = await fetch(`${this.baseUrl}/api/detection/robot-status`);
+        return await res.json();
+    }
+
+    async getDetectionStats(windowSeconds = null) {
+        const query = windowSeconds ? `?window_seconds=${windowSeconds}` : '';
+        const res = await fetch(`${this.baseUrl}/api/detection/statistics${query}`);
+        return await res.json();
+    }
+
+    async getSpindleStatus() {
+        const res = await fetch(`${this.baseUrl}/api/detection/spindle-status`);
+        return await res.json();
+    }
+
+    // ========== 公众虚拟纺纱体验 API ==========
+    async createVirtualSpinningSession(params = {}) {
+        const res = await fetch(`${this.baseUrl}/api/virtual-spinning/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        return await res.json();
+    }
+
+    async controlVirtualSpinning(params) {
+        const res = await fetch(`${this.baseUrl}/api/virtual-spinning/control`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        return await res.json();
+    }
+
+    async getVirtualSpinningSnapshot(sessionId) {
+        const res = await fetch(`${this.baseUrl}/api/virtual-spinning/snapshot/${sessionId}`);
+        return await res.json();
+    }
+
+    async closeVirtualSpinningSession(sessionId) {
+        const res = await fetch(`${this.baseUrl}/api/virtual-spinning/session/${sessionId}`, {
+            method: 'DELETE'
+        });
+        return await res.json();
+    }
+
+    async getVirtualSpinningStats() {
+        const res = await fetch(`${this.baseUrl}/api/virtual-spinning/statistics`);
+        return await res.json();
+    }
+
+    async getVirtualSpinningFiberOptions() {
+        const res = await fetch(`${this.baseUrl}/api/virtual-spinning/fiber-options`);
+        return await res.json();
+    }
 }
 
 const apiClient = new ApiClient();
