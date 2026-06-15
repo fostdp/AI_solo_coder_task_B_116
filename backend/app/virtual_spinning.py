@@ -58,7 +58,7 @@ class VirtualSpinningEngine:
     }
 
     def __init__(self, session_id: str = None):
-        self.session_id = session_id or f"session_{int(time.time()*1000)}"
+        self.session_id = session_id or f"session_{int(time.time()*1000000)}_{random.randint(1000, 9999)}"
         self.state = VirtualSpinningState(
             session_id=self.session_id,
             start_time=time.time(),
@@ -120,11 +120,14 @@ class VirtualSpinningEngine:
 
     def reset(self):
         """重置纺纱"""
+        self.state.is_running = False
         self.state.yarn_length_m = 0.0
         self.state.break_count = 0
         self.state.quality_score = 0.0
         self.state.efficiency_score = 0.0
         self.state.twist_rotation = 0.0
+        self.state.wheel_rpm = 0.0
+        self.state.spindle_rpm = 0.0
         self.state.message = "已重置，准备开始"
         self._initialize_fiber_pool()
 
